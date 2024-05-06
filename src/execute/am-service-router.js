@@ -11,8 +11,8 @@ const Player = require("../services/am-player");
 
 const { SPOTIPY_CLIENT_ID } = require("../server-config/constants");
 const router = express.Router();
-// router.options('*', cors())
-// router.use(cors());
+//router.options("*", cors());
+
 const amService = new AmbientMusicService();
 
 router
@@ -61,6 +61,12 @@ router
     const result = await amService.getAllPlaylists();
 
     try {
+      // res.header({
+      //   "Access-Control-Allow-Origin": "*",
+      //   "Access-Control-Allow-Methods": "GET,PUT,POST,DELETE",
+      //   "Access-Control-Allow-Headers": "Content-Type",
+      // });
+
       res.send(new ResponseBuilder().message(result).build());
     } catch (error) {
       if (error instanceof ServiceError) {
@@ -77,9 +83,11 @@ router
       res.send(new ResponseBuilder().message(response).build());
     } catch (error) {
       if (error instanceof ServiceError) {
-        throw error; // foward
+        //throw error; // foward
+        return new ResponseBuilder(error.code).message(error.data).build();
       } else {
-        throw new ServiceError(400, "Bad Request");
+        //throw new ServiceError(400, "Bad Request");
+        return new ResponseBuilder(400).message("Bad Request").build();
       }
     }
 
@@ -90,6 +98,22 @@ router
     //const amService = new AmbientMusicService();
     try {
       const response = await amService.stop();
+      res.send(new ResponseBuilder().message(response).build());
+    } catch (error) {
+      if (error instanceof ServiceError) {
+        throw error; // foward
+      } else {
+        throw new ServiceError(400, "Bad Request");
+      }
+    }
+
+    // TODO compose response
+  })
+  .put("/lights/:counts", async (req, res) => {
+    console.log(`light counts : ${req.params.counts}`);
+    //const amService = new AmbientMusicService();
+    try {
+      const response = await amService.setLightCounts(req.params.counts);
       res.send(new ResponseBuilder().message(response).build());
     } catch (error) {
       if (error instanceof ServiceError) {

@@ -18,6 +18,7 @@ module.exports = class EsApi {
   }
   async getPlaylist(id) {
     let queryString = {
+      size: 400,
       query: {
         match: {
           playlist_id: id,
@@ -49,6 +50,6 @@ module.exports = class EsApi {
       },
     };
     let response = await this.client.get(queryString);
-    return response
+    return response;
   }
 };

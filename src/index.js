@@ -1,5 +1,6 @@
 //const SmartApp = require('@smartthings/smartapp');
 const express = require("express");
+const cors = require("cors");
 
 const amServiceRouter = require("./execute/am-service-router");
 const photoServiceRouter = require("./execute/photo-service-router");
@@ -11,7 +12,17 @@ const PORT = 8080;
 const AmbientMusicService = require("./services/ambient-music-service");
 
 server.use(express.json());
-server.use(require("cors")());
+server.options("*", cors());
+server.use(
+  cors({
+    origin: "*",
+    credentials: true,
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    allowedHeaders: ["Content-Type", "Authorization"],
+    preflightContinue: false,
+    optionsSuccessStatus: 200,
+  })
+);
 server.use("/", amServiceRouter);
 server.use("/photo", photoServiceRouter);
 server.use((req, res, next) => {

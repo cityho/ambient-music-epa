@@ -3,6 +3,7 @@ const DeviceApis = require("../smartthings-apis/device-apis");
 const ColorMap = require("../utils/color-table");
 const MusicDataBuilder = require("../utils/music-data-builder").Builder;
 const ESApi = require("../apis/es-api");
+const { LIGHT1, LIGHT2 } = require("../utils/device-constants");
 
 const OnSetMocks = require("../mocks/onset-mocks");
 const ColorMocks = require("../mocks/color-mocks");
@@ -21,30 +22,42 @@ const commandItem = {
 
 module.exports = class AmbientMusicService {
   constructor() {
+    this.devices = [LIGHT1, LIGHT2];
     this.deviceId = "0b4a112c-feb0-4457-afba-3c859b9f70ad";
     this.accessToken = "b87326ac-2e52-4b27-a41f-04334f4faee9";
     this.deviceApis = new DeviceApis(this.accessToken);
     this.esApi = new ESApi();
     this.isPlaying = false;
     this.timers = [];
+    this.availableCounts = 1;
   }
-  setInitialState() {
+  setInitialState(initColor = ColorMap.PURPLE) {
+    let devices = [];
+    if (this.availableCounts < 2) devices = [LIGHT1];
+    else devices = [...this.devices];
+
     let initCommands = [
       { component: "main", capability: "switch", command: "on", arguments: [] },
       {
         component: "main",
         capability: "switchLevel",
         command: "setLevel",
-        arguments: [20],
+        arguments: [82],
       },
       {
         component: "main",
         capability: "colorControl",
         command: "setColor",
-        arguments: [ColorMap.PURPLE],
+        arguments: [initColor],
       },
     ];
-    this.deviceApis.executeCommands(this.deviceId, initCommands);
+    devices.forEach((deviceId) => {
+      this.deviceApis.executeCommands(deviceId, initCommands);
+    });
+  }
+  async setLightCounts(counts) {
+    this.availableCounts = counts;
+    return counts;
   }
   async getOnsets(id) {
     //return MusicData.Builder.getOnsets();
@@ -55,12 +68,52 @@ module.exports = class AmbientMusicService {
     //return MusicData.Builder.getColors();
     return await ColorMocks.colors;
   }
-  async start(id) {
-    this.setInitialState();
+  async setDeviceCommands(colors, onsets) {
+    let devices = [];
+    if (this.availableCounts < 2) devices = [LIGHT1];
+    else devices = [...this.devices];
 
+    const colorlen = colors.length;
+
+    for (let i = 0; i < onsets.length; ++i) {
+      const s = onsets[i];
+
+      const color = colors[(i + 1) % colorlen];
+      let timerId = setTimeout(() => {
+        console.log(
+          `${s} sec  , command : ${command}, color : ${(i + 1) % colorlen}`
+        );
+        // this.deviceApis.executeCommand(
+        //   this.devices[0],
+        //   component,
+        //   capability,
+        //   command,
+        //   [color]
+        // );
+        devices.forEach((deviceId) => {
+          this.deviceApis.executeCommand(
+            deviceId,
+            component,
+            capability,
+            command,
+            [color]
+          );
+        });
+        if (this.timers) {
+          this.timers.shift();
+        }
+      }, s * 1000);
+      this.timers.push(timerId);
+    }
+  }
+  async start(id) {
     //const onsets = MusicDataBuilder.getOnsets();
     //const colors = MusicDataBuilder.getColors();
     //const mood = "joy";
+    this.timers.map((timerId) => {
+      clearTimeout(timerId);
+    });
+    this.timers = [];
 
     const { onsets, mood } = await this.getMusicInfo(id);
     const colors = colorMocks.colors[mood].map((c) => ({
@@ -69,29 +122,11 @@ module.exports = class AmbientMusicService {
     }));
     console.log("colors ", colors);
 
-    const colorlen = colors.length;
-    for (let i = 0; i < onsets.length; ++i) {
-      const s = onsets[i];
+    //const colorlen = colors.length;
 
-      const color = colors[i % colorlen];
-      let timerId = setTimeout(() => {
-        console.log(
-          `${s} sec  , command : ${command}, color : ${i % colorlen}`
-        );
-        this.deviceApis.executeCommand(
-          this.deviceId,
-          component,
-          capability,
-          command,
-          [color]
-        );
-        if (this.timers) {
-          this.timers.shift();
-        }
-      }, s * 1000);
+    this.setInitialState(colors[0]);
 
-      this.timers.push(timerId);
-    }
+    this.setDeviceCommands(colors, onsets);
 
     this.isPlaying = true;
 
@@ -104,6 +139,22 @@ module.exports = class AmbientMusicService {
       clearTimeout(timerId);
     });
     this.timers = [];
+
+    const cmd = {
+      component: "main",
+      capability: "switch",
+      command: "off",
+      arguments: [],
+    };
+
+    let devices = [];
+    if (this.availableCounts < 2) devices = [LIGHT1];
+    else devices = [...this.devices];
+
+    devices.forEach((deviceId) => {
+      this.deviceApis.executeCommands(deviceId, [cmd]);
+    });
+
     return "stopped";
   }
   async getPlayList(id) {
